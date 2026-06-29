@@ -34,6 +34,7 @@ export default function App() {
   });
   const [activeTab, setActiveTab] = useState('dashboard');
   const [theme, setTheme] = useState('dark');
+  const [editingLog, setEditingLog] = useState(null);
 
   const handleUnlockSubmit = (e) => {
     e.preventDefault();
@@ -438,6 +439,10 @@ export default function App() {
               logs={appData.logs} 
               onAddLog={handleAddLog} 
               onLogsUpdate={handleLogsUpdate}
+              editingLog={editingLog}
+              setEditingLog={setEditingLog}
+              setActiveTab={setActiveTab}
+              onUpdateLog={handleUpdateLog}
             />
           </div>
           <div className="app-content-slide">
@@ -447,6 +452,9 @@ export default function App() {
               onDeleteLog={handleDeleteLog} 
               onDeleteMultipleLogs={handleDeleteMultipleLogs}
               onUpdateLog={handleUpdateLog} 
+              editingLog={editingLog}
+              setEditingLog={setEditingLog}
+              setActiveTab={setActiveTab}
             />
           </div>
           <div className="app-content-slide">

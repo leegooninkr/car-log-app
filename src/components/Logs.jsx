@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Trash2, Edit2, Calendar, Filter, X, BarChart3, TrendingUp, Info, FileSpreadsheet } from 'lucide-react';
 import { exportToNtsCsv } from '../utils/csvExport';
 
-export default function Logs({ logs, settings, onDeleteLog, onDeleteMultipleLogs, onUpdateLog }) {
+export default function Logs({ logs, settings, onDeleteLog, onDeleteMultipleLogs, onUpdateLog, editingLog, setEditingLog, setActiveTab }) {
   // State for search filters
   const [selectedMonth, setSelectedMonth] = useState('전체');
   const [startDate, setStartDate] = useState('');
@@ -12,25 +12,12 @@ export default function Logs({ logs, settings, onDeleteLog, onDeleteMultipleLogs
   // State for bulk selection
   const [selectedIds, setSelectedIds] = useState([]);
 
-  // State for editing log
-  const [editingLog, setEditingLog] = useState(null);
-
   // Clear selected checkboxes when filters change
   useEffect(() => {
     setSelectedIds([]);
   }, [selectedMonth, startDate, endDate, purposeFilter]);
 
-  // Lock background scroll when editing a log
-  useEffect(() => {
-    if (editingLog) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
-  }, [editingLog]);
+
 
   // Helper to format date with day of the week
   const formatDateWithDay = (dateStr) => {
@@ -95,40 +82,7 @@ export default function Logs({ logs, settings, onDeleteLog, onDeleteMultipleLogs
   const handleEditClick = (log, e) => {
     e.stopPropagation();
     setEditingLog({ ...log });
-  };
-
-  const handleEditChange = (e) => {
-    const { name, value } = e.target;
-    setEditingLog(prev => {
-      const updated = { ...prev, [name]: value };
-      
-      // Auto-recalculate in edit form
-      if (name === 'startOdometer' || name === 'endOdometer') {
-        const start = name === 'startOdometer' ? Number(value) : Number(prev.startOdometer);
-        const end = name === 'endOdometer' ? Number(value) : Number(prev.endOdometer);
-        updated.distance = Math.max(0, end - start);
-      } else if (name === 'distance') {
-        const start = Number(prev.startOdometer);
-        const dist = Number(value);
-        updated.endOdometer = Math.round(start + dist);
-      }
-      return updated;
-    });
-  };
-
-  const handleEditSubmit = (e) => {
-    e.preventDefault();
-    if (Number(editingLog.endOdometer) < Number(editingLog.startOdometer)) {
-      alert('도착 계기판 값은 출발 계기판 값보다 크거나 같아야 합니다.');
-      return;
-    }
-    onUpdateLog({
-      ...editingLog,
-      startOdometer: Number(editingLog.startOdometer),
-      endOdometer: Number(editingLog.endOdometer),
-      distance: Number(editingLog.distance)
-    });
-    setEditingLog(null);
+    setActiveTab('dashboard');
   };
 
   const handleClearFilters = () => {
@@ -435,225 +389,6 @@ export default function Logs({ logs, settings, onDeleteLog, onDeleteMultipleLogs
           })
         )}
       </div>
-
-      {/* 4. Edit Modal Sheet (Custom Overlay) */}
-      {editingLog && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.8)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          padding: '10px',
-          zIndex: 1100
-        }} onClick={() => setEditingLog(null)}>
-          
-          <form 
-            onSubmit={handleEditSubmit}
-            onClick={(e) => e.stopPropagation()}
-            className="fade-in"
-            style={{
-              width: '100%',
-              maxWidth: '460px',
-              background: 'var(--bg-secondary)',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border-light)',
-              padding: '20px 16px',
-              maxHeight: '85vh',
-              overflowY: 'auto',
-              boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
-              <strong style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)' }}>운행 기록 수정</strong>
-              <button 
-                type="button" 
-                onClick={() => setEditingLog(null)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">날짜</label>
-                <input 
-                  type="date" 
-                  name="date"
-                  value={editingLog.date} 
-                  onChange={handleEditChange}
-                  className="form-control"
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">구분 (목적)</label>
-                <select 
-                  name="purpose"
-                  value={editingLog.purpose} 
-                  onChange={handleEditChange}
-                  className="form-select"
-                >
-                  <option value="업무용">3.업무용</option>
-                  <option value="출퇴근">2.출퇴근</option>
-                  <option value="일반용">1.일반용(개인)</option>
-                </select>
-              </div>
-            </div>
-
-            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)', marginBottom: '14px' }}>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '8px' }}>출발지 정보</div>
-              <div className="form-row" style={{ gap: '8px' }}>
-                <div style={{ width: '95px' }}>
-                  <label className="form-label" style={{ fontSize: '0.75rem' }}>분류</label>
-                  <select 
-                    name="depClass"
-                    value={editingLog.depClass} 
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setEditingLog(prev => ({ ...prev, depClass: val, depName: val }));
-                    }}
-                    className="form-select"
-                    style={{ padding: '8px 10px', fontSize: '0.85rem' }}
-                  >
-                    <option value="자택">자택</option>
-                    <option value="근무지">근무지</option>
-                    <option value="거래처">거래처</option>
-                    <option value="숙소">숙소</option>
-                    <option value="기타">기타</option>
-                  </select>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label className="form-label" style={{ fontSize: '0.75rem' }}>출발 주소 또는 명칭</label>
-                  <input 
-                    type="text" 
-                    name="depAddr"
-                    value={editingLog.depAddr || ''} 
-                    onChange={handleEditChange}
-                    className="form-control"
-                    style={{ padding: '8px 12px', fontSize: '0.85rem' }}
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)', marginBottom: '14px' }}>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '8px' }}>도착지 정보</div>
-              <div className="form-row" style={{ gap: '8px', marginBottom: '8px' }}>
-                <div style={{ width: '95px' }}>
-                  <label className="form-label" style={{ fontSize: '0.75rem' }}>분류</label>
-                  <select 
-                    name="destClass"
-                    value={editingLog.destClass} 
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setEditingLog(prev => ({ ...prev, destClass: val, destName: val }));
-                    }}
-                    className="form-select"
-                    style={{ padding: '8px 10px', fontSize: '0.85rem' }}
-                  >
-                    <option value="자택">자택</option>
-                    <option value="근무지">근무지</option>
-                    <option value="거래처">거래처</option>
-                    <option value="숙소">숙소</option>
-                    <option value="기타">기타</option>
-                  </select>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label className="form-label" style={{ fontSize: '0.75rem' }}>도착 주소 또는 명칭</label>
-                  <input 
-                    type="text" 
-                    name="destAddr"
-                    value={editingLog.destAddr || ''} 
-                    onChange={handleEditChange}
-                    className="form-control"
-                    style={{ padding: '8px 12px', fontSize: '0.85rem' }}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label" style={{ fontSize: '0.75rem' }}>방문한 곳 (경유지)</label>
-                <input 
-                  type="text" 
-                  name="visitedPlaces"
-                  value={editingLog.visitedPlaces || ''} 
-                  onChange={handleEditChange}
-                  className="form-control"
-                  placeholder="예: 용산역, 잠원도서관"
-                />
-              </div>
-            </div>
-
-            <div className="form-row" style={{ marginBottom: '14px' }}>
-              <div className="form-group">
-                <label className="form-label">출발 계기판 (km)</label>
-                <input 
-                  type="number" 
-                  name="startOdometer"
-                  value={editingLog.startOdometer} 
-                  onChange={handleEditChange}
-                  className="form-control"
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">도착 계기판 (km)</label>
-                <input 
-                  type="number" 
-                  name="endOdometer"
-                  value={editingLog.endOdometer} 
-                  onChange={handleEditChange}
-                  className="form-control"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="form-row" style={{ marginBottom: '18px' }}>
-              <div className="form-group">
-                <label className="form-label">주행 거리 (km)</label>
-                <input 
-                  type="number" 
-                  name="distance"
-                  value={editingLog.distance} 
-                  onChange={handleEditChange}
-                  className="form-control"
-                  step="any"
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">비고</label>
-                <input 
-                  type="text" 
-                  name="notes"
-                  value={editingLog.notes || ''} 
-                  onChange={handleEditChange}
-                  className="form-control"
-                />
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button type="button" onClick={() => setEditingLog(null)} className="btn-secondary" style={{ flex: 1 }}>
-                취소
-              </button>
-              <button type="submit" className="btn-primary" style={{ flex: 2 }}>
-                수정 완료
-              </button>
-            </div>
-
-          </form>
-        </div>
-      )}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { PlusCircle, Navigation, MapPin, Check, Calendar, Users, RefreshCw, Uplo
 import { fetchScheduleSheet } from '../utils/googleSheets';
 import * as XLSX from 'xlsx';
 
-export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate }) {
+export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate, editingLog, setEditingLog, setActiveTab, onUpdateLog }) {
   const getTodayStr = () => new Date().toISOString().slice(0, 10);
   
   // Find latest log to determine default start odometer
@@ -419,6 +419,23 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate }) {
 
   // Auto fill form fields if a log already exists for the selected date
   useEffect(() => {
+    if (editingLog) {
+      setDate(editingLog.date);
+      setDistance(editingLog.distance !== undefined ? editingLog.distance : '');
+      setVisitedPlaces(editingLog.visitedPlaces || '');
+      setPurpose(editingLog.purpose || '업무용');
+      setNotes(editingLog.notes || '1');
+      setDepClass(editingLog.depClass || '자택');
+      setDepName(editingLog.depName || '자택');
+      setDepAddr(editingLog.depAddr || '');
+      setDestClass(editingLog.destClass || '자택');
+      setDestName(editingLog.destName || '자택');
+      setDestAddr(editingLog.destAddr || '');
+      setStartOdometer(editingLog.startOdometer !== undefined ? editingLog.startOdometer : '');
+      setEndOdometer(editingLog.endOdometer !== undefined ? editingLog.endOdometer : '');
+      return;
+    }
+
     const existingLog = logs.find(l => l.date === date);
     if (existingLog) {
       setDistance(existingLog.distance !== undefined ? existingLog.distance : '');
@@ -461,7 +478,7 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate }) {
       setDestName('자택');
       setDestAddr(settings.defaultDestAddr || '경기 안산시 상록구 팔곡이동');
     }
-  }, [date, logs, settings]);
+  }, [date, logs, settings, editingLog]);
 
   // Recalculate distance when start or end odometer changes
   const handleOdometerChange = (type, value) => {
@@ -501,8 +518,7 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate }) {
       return;
     }
 
-    const newLog = {
-      id: 'log-' + Date.now(),
+    const logData = {
       date,
       purpose,
       depClass,
@@ -518,11 +534,23 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate }) {
       notes
     };
 
-    onAddLog(newLog);
-
-    // Show success indicator and reset form (but retain latest odometer as start odometer)
-    setShowSuccess(true);
-    setTimeout(() => setShowSuccess(false), 2000);
+    if (editingLog) {
+      onUpdateLog({
+        ...editingLog,
+        ...logData
+      });
+      setEditingLog(null);
+      setActiveTab('logs');
+      alert('운행 기록이 성공적으로 수정되었습니다.');
+    } else {
+      const newLog = {
+        id: 'log-' + Date.now(),
+        ...logData
+      };
+      onAddLog(newLog);
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 2000);
+    }
 
     // Reset fields
     setEndOdometer('');
@@ -536,7 +564,7 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate }) {
 
   return (
     <div className="fade-in dashboard-container" style={{ paddingBottom: '30px' }}>
-      <h2>운행 기록 입력</h2>
+      <h2>{editingLog ? '운행 기록 수정' : '운행 기록 입력'}</h2>
 
       <div className="dashboard-grid">
         {/* Left Column: Logging Form */}
@@ -717,9 +745,28 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate }) {
         </div>
 
         {/* Submit */}
-        <button type="submit" className="btn-primary" style={{ width: '100%', marginTop: '8px' }}>
-          <PlusCircle size={18} /> 운행기록 등록
-        </button>
+        {editingLog ? (
+          <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+            <button 
+              type="button" 
+              onClick={() => {
+                setEditingLog(null);
+                setActiveTab('logs');
+              }} 
+              className="btn-secondary" 
+              style={{ flex: 1 }}
+            >
+              수정 취소
+            </button>
+            <button type="submit" className="btn-primary" style={{ flex: 2 }}>
+              수정 완료
+            </button>
+          </div>
+        ) : (
+          <button type="submit" className="btn-primary" style={{ width: '100%', marginTop: '8px' }}>
+            <PlusCircle size={18} /> 운행기록 등록
+          </button>
+        )}
 
         {showSuccess && (
           <div style={{ 
