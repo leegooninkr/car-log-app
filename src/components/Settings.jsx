@@ -557,6 +557,26 @@ export default function Settings({
           </label>
         </div>
       </div>
+
+      {/* 5. App Security Lock */}
+      <div className="glass-card" style={{ border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: '#ef4444' }}>
+          <ShieldAlert size={18} /> 보안 및 앱 잠금
+        </h3>
+        <p style={{ fontSize: '0.85rem', marginBottom: '16px' }}>
+          현재 기기의 접근 권한을 수동으로 해제하여 화면을 다시 잠급니다. 다음 실행 시 마스터 비밀번호를 다시 요구합니다.
+        </p>
+        <button 
+          onClick={() => {
+            localStorage.removeItem('car_log_app_unlocked');
+            window.location.reload();
+          }} 
+          className="btn-secondary" 
+          style={{ width: '100%', borderColor: 'rgba(239, 68, 68, 0.3)', color: '#f87171' }}
+        >
+          수동 앱 잠금 (보안 로그아웃)
+        </button>
+      </div>
     </div>
   );
 }

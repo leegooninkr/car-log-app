@@ -7,6 +7,11 @@ import Settings from './components/Settings';
 import { appendLogToSheet, postToAppsScript } from './utils/googleSheets';
 
 export default function App() {
+  // Master Password Lock State
+  const [isUnlocked, setIsUnlocked] = useState(() => localStorage.getItem('car_log_app_unlocked') === 'true');
+  const [password, setPassword] = useState('');
+  const [lockError, setLockError] = useState('');
+
   // Load data from local storage (or seed data on first run)
   const [appData, setAppData] = useState(() => {
     const data = loadData();
@@ -29,6 +34,126 @@ export default function App() {
   });
   const [activeTab, setActiveTab] = useState('dashboard');
   const [theme, setTheme] = useState('dark');
+
+  const handleUnlockSubmit = (e) => {
+    e.preventDefault();
+    if (password === 'nicom123.') {
+      localStorage.setItem('car_log_app_unlocked', 'true');
+      setIsUnlocked(true);
+      setLockError('');
+    } else {
+      setLockError('비밀번호가 올바르지 않습니다.');
+      setPassword('');
+    }
+  };
+
+  if (!isUnlocked) {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        width: '100vw',
+        height: '100vh',
+        background: 'linear-gradient(135deg, #121824 0%, #090d16 100%)',
+        color: '#ffffff',
+        fontFamily: 'var(--font-main)',
+        padding: '20px',
+        boxSizing: 'border-box'
+      }}>
+        <form onSubmit={handleUnlockSubmit} style={{
+          width: '100%',
+          maxWidth: '340px',
+          background: 'rgba(255, 255, 255, 0.03)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: 'var(--radius-lg)',
+          padding: '30px 24px',
+          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5)',
+          textAlign: 'center'
+        }}>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '56px',
+            height: '56px',
+            borderRadius: '50%',
+            background: 'rgba(59, 130, 246, 0.1)',
+            border: '1px solid rgba(59, 130, 246, 0.2)',
+            marginBottom: '20px',
+            color: 'var(--primary)'
+          }}>
+            <Car size={28} />
+          </div>
+          
+          <h2 style={{
+            fontSize: '1.25rem',
+            fontWeight: 700,
+            fontFamily: 'var(--font-title)',
+            marginBottom: '8px',
+            color: 'var(--text-primary)'
+          }}>보안 액세스</h2>
+          
+          <p style={{
+            fontSize: '0.85rem',
+            color: 'var(--text-secondary)',
+            marginBottom: '24px',
+            lineHeight: 1.4
+          }}>차량 운행기록부 사용을 위해<br />지정된 비밀번호를 입력해 주세요.</p>
+          
+          <div style={{ marginBottom: '16px', textAlign: 'left' }}>
+            <input 
+              type="password"
+              placeholder="비밀번호 입력"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={{
+                width: '100%',
+                 padding: '12px 14px',
+                 background: 'rgba(0,0,0,0.2)',
+                 border: '1px solid var(--border-light)',
+                 borderRadius: 'var(--radius-md)',
+                 color: '#ffffff',
+                 fontSize: '1rem',
+                 outline: 'none',
+                 boxSizing: 'border-box'
+              }}
+              autoFocus
+              required
+            />
+          </div>
+          
+          {lockError && (
+            <div style={{
+              fontSize: '0.8rem',
+              color: '#f87171',
+              marginBottom: '16px',
+              textAlign: 'center'
+            }}>
+              ❌ {lockError}
+            </div>
+          )}
+          
+          <button 
+            type="submit" 
+            className="btn-primary"
+            style={{
+              width: '100%',
+              padding: '12px',
+              fontWeight: 600,
+              fontSize: '0.95rem',
+              border: 'none',
+              cursor: 'pointer'
+            }}
+          >
+            잠금 해제
+          </button>
+        </form>
+      </div>
+    );
+  }
 
   // Touch Swiping States for Tab Navigation
   const [touchStart, setTouchStart] = useState({ x: 0, y: 0 });
