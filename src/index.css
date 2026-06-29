@@ -125,9 +125,16 @@ body {
 
 @media (min-width: 480px) {
   #root {
-    height: 92vh;
+    height: 94vh;
     border-radius: var(--radius-lg);
     border: 1px solid var(--border-light);
+  }
+}
+
+@media (min-width: 768px) {
+  #root {
+    max-width: 1080px; /* Expand horizontally for desktop view */
+    height: 90vh;
   }
 }
 
@@ -547,4 +554,20 @@ p {
   color: var(--text-secondary);
   font-size: 0.9rem;
   line-height: 1.5;
+}
+
+/* Responsive Dashboard Grid Layout */
+.dashboard-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+@media (min-width: 768px) {
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    align-items: start;
+    gap: 24px;
+  }
 }

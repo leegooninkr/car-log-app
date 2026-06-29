@@ -515,11 +515,13 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate }) {
   const latestEndOdo = getLatestEndOdometer();
 
   return (
-    <div className="fade-in" style={{ paddingBottom: '30px' }}>
+    <div className="fade-in dashboard-container" style={{ paddingBottom: '30px' }}>
       <h2>운행 기록 입력</h2>
 
-      {/* 2. Logging Form */}
-      <form onSubmit={handleSubmit} className="glass-card">
+      <div className="dashboard-grid">
+        {/* Left Column: Logging Form */}
+        <div className="dashboard-col-left">
+          <form onSubmit={handleSubmit} className="glass-card">
         {/* Date and Purpose */}
         <div className="form-row">
           <div className="form-group">
@@ -715,9 +717,12 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate }) {
           </div>
         )}
       </form>
+        </div>
 
-      {/* 3. Google Sheets Schedule Parser Card */}
-      <div className="glass-card" style={{ marginTop: '20px' }}>
+        {/* Right Column: Google Sheets & Excel Aggregators */}
+        <div className="dashboard-col-right">
+          {/* 3. Google Sheets Schedule Parser Card */}
+          <div className="glass-card" style={{ marginTop: '0' }}>
         <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: '#10b981' }}>
           <Calendar size={18} /> 구글 일정표 연동 방문 경로 추출
         </h3>
@@ -933,5 +938,7 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate }) {
         )}
       </div>
     </div>
+  </div>
+</div>
   );
 }

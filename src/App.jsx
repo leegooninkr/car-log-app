@@ -54,13 +54,17 @@ export default function App() {
         flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
+        position: 'fixed',
+        top: 0,
+        left: 0,
         width: '100vw',
         height: '100vh',
         background: 'linear-gradient(135deg, #121824 0%, #090d16 100%)',
         color: '#ffffff',
         fontFamily: 'var(--font-main)',
         padding: '20px',
-        boxSizing: 'border-box'
+        boxSizing: 'border-box',
+        zIndex: 9999
       }}>
         <form onSubmit={handleUnlockSubmit} style={{
           width: '100%',
