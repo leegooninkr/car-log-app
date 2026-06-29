@@ -100,7 +100,7 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate, edit
       const words = cleanedLine.split(/\s+/);
       for (const word of words) {
         // 2. Exact match for place names with suffix keywords
-        const match = word.match(/^([가-힣A-Za-z0-9]+(역|도서관|스마트도서관|공원|구청|시청|센터|교|빌딩|APT|아파트))/i);
+        const match = word.match(/^([가-힣A-Za-z0-9]+(역|도서관|스마트도서관|공원|구청|시청|교육청|센터|빌딩|APT|아파트|초등학교|중학교|고등학교|대학교|대교))/i);
         if (match) {
           const placeName = match[1];
           
