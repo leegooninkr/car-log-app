@@ -20,6 +20,18 @@ export default function Logs({ logs, settings, onDeleteLog, onDeleteMultipleLogs
     setSelectedIds([]);
   }, [selectedMonth, startDate, endDate, purposeFilter]);
 
+  // Lock background scroll when editing a log
+  useEffect(() => {
+    if (editingLog) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [editingLog]);
+
   // Helper to format date with day of the week
   const formatDateWithDay = (dateStr) => {
     const d = new Date(dateStr);
