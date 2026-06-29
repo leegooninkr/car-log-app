@@ -72,15 +72,24 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate, edit
   }, [scheduleYear]);
 
   // Extract Visited Places based on Keywords ("역", "도서관", "지역명")
-  // Extract Visited Places based on Keywords ("역", "도서관", "지역명")
   const extractPlaces = (cellText) => {
     if (!cellText) return '';
     const lines = cellText.split('\n');
     const places = [];
     
+    // Active support keywords (점검, 교체, 도서, 지원, 함)
+    const activeWorkRegex = /(점검|교체|도서|지원|수리|작업|방문|함)/;
+    // Internal duty / passive words to ignore (당직, 재택, 휴가)
+    const ignoreWorkRegex = /(당직|재택|휴가|연차)/;
+    
     for (let line of lines) {
       line = line.trim();
       if (!line) continue;
+      
+      // Filter: only parse rows that indicate support work, skip passive/internal duty rows
+      if (!activeWorkRegex.test(line) || ignoreWorkRegex.test(line)) {
+        continue;
+      }
       
       // 1. Remove leading numbers, dots, dashes, stars (e.g. "1.양재도서관" -> "양재도서관", "* 철산역" -> "철산역")
       const cleanedLine = line.replace(/^[^가-힣A-Za-z0-9]+/g, '')
