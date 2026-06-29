@@ -436,10 +436,9 @@ export default function Logs({ logs, settings, onDeleteLog, onDeleteMultipleLogs
           backdropFilter: 'blur(8px)',
           display: 'flex',
           justifyContent: 'center',
-          alignItems: 'flex-start',
-          overflowY: 'auto',
-          padding: '20px 14px',
-          zIndex: 100
+          alignItems: 'center',
+          padding: '10px',
+          zIndex: 1100
         }} onClick={() => setEditingLog(null)}>
           
           <form 
@@ -448,13 +447,14 @@ export default function Logs({ logs, settings, onDeleteLog, onDeleteMultipleLogs
             className="fade-in"
             style={{
               width: '100%',
-              maxWidth: '500px',
+              maxWidth: '460px',
               background: 'var(--bg-secondary)',
-              borderRadius: 'var(--radius-lg)',
+              borderRadius: 'var(--radius-md)',
               border: '1px solid var(--border-light)',
-              padding: '16px 16px 20px 16px',
-              boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
-              marginBottom: '20px'
+              padding: '20px 16px',
+              maxHeight: '85vh',
+              overflowY: 'auto',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>

@@ -382,10 +382,10 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate }) {
           purpose: '업무용',
           depClass: '자택',
           depName: '자택',
-          depAddr: '경기 안산시 상록구 팔곡이동',
+          depAddr: settings.defaultDepAddr || '경기 안산시 상록구 팔곡이동',
           destClass: '자택',
           destName: '자택',
-          destAddr: '경기 안산시 상록구 팔곡이동',
+          destAddr: settings.defaultDestAddr || '경기 안산시 상록구 팔곡이동',
           visitedPlaces: sheetPlaces,
           startOdometer: settings.baseOdometer,
           endOdometer: settings.baseOdometer + item.distance,
@@ -440,8 +440,28 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate }) {
       setNotes('1');
       setStartOdometer(getLatestEndOdometer());
       setEndOdometer('');
+      
+      // Auto-inherit: set departure to previous day's destination
+      const pastLogs = logs.filter(l => l.date < date);
+      const sortedPastLogs = [...pastLogs].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+      const lastLog = sortedPastLogs[0];
+      
+      if (lastLog) {
+        setDepClass(lastLog.destClass || '자택');
+        setDepName(lastLog.destName || '자택');
+        setDepAddr(lastLog.destAddr || settings.defaultDepAddr || '경기 안산시 상록구 팔곡이동');
+      } else {
+        setDepClass('자택');
+        setDepName('자택');
+        setDepAddr(settings.defaultDepAddr || '경기 안산시 상록구 팔곡이동');
+      }
+      
+      // Destination defaults to settings configuration
+      setDestClass('자택');
+      setDestName('자택');
+      setDestAddr(settings.defaultDestAddr || '경기 안산시 상록구 팔곡이동');
     }
-  }, [date, logs]);
+  }, [date, logs, settings]);
 
   // Recalculate distance when start or end odometer changes
   const handleOdometerChange = (type, value) => {

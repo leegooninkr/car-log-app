@@ -1,4 +1,4 @@
-const LOCAL_STORAGE_KEY = 'car_log_app_data_v4'; // Changed key to force reset to empty database
+const LOCAL_STORAGE_KEY = 'car_log_app_data_v5'; // Changed key to force reset to v5 database
 
 const DEFAULT_SETTINGS = {
   bizNumber: '',
@@ -7,7 +7,9 @@ const DEFAULT_SETTINGS = {
   baseOdometer: 0,
   ownerType: '자가', // 렌트, 리스, 자가
   department: '',
-  driverName: ''
+  driverName: '',
+  defaultDepAddr: '경기 안산시 상록구 팔곡이동',
+  defaultDestAddr: '경기 안산시 상록구 팔곡이동'
 };
 
 const SEED_TEMPLATES = [];

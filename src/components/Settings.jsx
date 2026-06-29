@@ -220,6 +220,33 @@ export default function Settings({
           </div>
         </div>
 
+        <div className="form-row">
+          <div className="form-group">
+            <label className="form-label">기본 출발지 주소</label>
+            <input 
+              type="text" 
+              name="defaultDepAddr" 
+              value={formData.defaultDepAddr || ''} 
+              onChange={handleInputChange} 
+              className="form-control" 
+              placeholder="예: 경기 안산시 상록구 팔곡이동"
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">기본 도착지 주소</label>
+            <input 
+              type="text" 
+              name="defaultDestAddr" 
+              value={formData.defaultDestAddr || ''} 
+              onChange={handleInputChange} 
+              className="form-control" 
+              placeholder="예: 경기 안산시 상록구 팔곡이동"
+              required
+            />
+          </div>
+        </div>
+
         <div className="form-group">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
             <label className="form-label" style={{ margin: 0 }}>기초 누적거리 (km)</label>
