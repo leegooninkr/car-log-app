@@ -71,18 +71,18 @@
   --accent: #d97706;
   
   --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #94a3b8;
+  --text-secondary: #1e293b;
+  --text-muted: #475569;
   
-  --border-light: rgba(0, 0, 0, 0.08);
+  --border-light: rgba(0, 0, 0, 0.12);
   
   /* Log categories colors */
-  --badge-business: rgba(8, 145, 178, 0.1);
-  --badge-business-text: #0e7490;
-  --badge-personal: rgba(79, 70, 229, 0.1);
-  --badge-personal-text: #4338ca;
-  --badge-commute: rgba(5, 150, 105, 0.1);
-  --badge-commute-text: #047857;
+  --badge-business: rgba(8, 145, 178, 0.12);
+  --badge-business-text: #0b667e;
+  --badge-personal: rgba(79, 70, 229, 0.12);
+  --badge-personal-text: #312e81;
+  --badge-commute: rgba(5, 150, 105, 0.12);
+  --badge-commute-text: #065f46;
 }
 
 /* Base Styles */
