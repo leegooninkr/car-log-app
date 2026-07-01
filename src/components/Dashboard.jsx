@@ -1020,85 +1020,84 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate, edit
         <div style={{ border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '12px', marginBottom: '16px', background: 'rgba(255,255,255,0.01)' }}>
           <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--secondary)', display: 'block', marginBottom: '10px' }}>주행거리 계산 (km)</span>
           
-          <div className="form-row" style={{ marginBottom: '10px' }}>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label" style={{ fontSize: '0.75rem' }}>출발 계기판</label>
-              <input 
-                type="number" 
-                value={startOdometer} 
-                onChange={(e) => handleOdometerChange('start', e.target.value)} 
-                className="form-control" 
-                style={{ padding: '8px 12px', fontSize: '0.85rem' }}
-                placeholder="km"
-                required
-              />
-            </div>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label" style={{ fontSize: '0.75rem' }}>도착 계기판</label>
+          <div className="form-group" style={{ marginBottom: '12px' }}>
+            <label className="form-label" style={{ fontSize: '0.75rem' }}>출발 계기판</label>
+            <input 
+              type="number" 
+              value={startOdometer} 
+              onChange={(e) => handleOdometerChange('start', e.target.value)} 
+              className="form-control" 
+              style={{ padding: '8px 12px', fontSize: '0.85rem', width: '100%' }}
+              placeholder="km"
+              required
+            />
+          </div>
+          
+          <div className="form-group" style={{ marginBottom: '12px' }}>
+            <label className="form-label" style={{ fontSize: '0.75rem' }}>도착 계기판</label>
+            <div style={{ display: 'flex', gap: '6px' }}>
               <input 
                 type="number" 
                 value={endOdometer} 
                 onChange={(e) => handleOdometerChange('end', e.target.value)} 
                 className="form-control" 
-                style={{ padding: '8px 12px', fontSize: '0.85rem', width: '100%', marginBottom: '8px' }}
+                style={{ padding: '8px 12px', fontSize: '0.85rem', flex: 1 }}
                 placeholder="km"
                 required
               />
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => cameraInputRef.current?.click()}
-                  disabled={ocrProcessing}
-                  className="btn-secondary"
-                  style={{ 
-                    flex: 1,
-                    padding: '8px 10px', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center',
-                    gap: '6px',
-                    fontSize: '0.8rem',
-                    opacity: ocrProcessing ? 0.5 : 1
-                  }}
-                  title="계기판 사진 촬영으로 자동 입력"
-                >
-                  <Camera size={14} /> 카메라 촬영
-                </button>
-                <input
-                  ref={cameraInputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={handleOcrCapture}
-                  style={{ display: 'none' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => albumInputRef.current?.click()}
-                  disabled={ocrProcessing}
-                  className="btn-secondary"
-                  style={{ 
-                    flex: 1,
-                    padding: '8px 10px', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center',
-                    gap: '6px',
-                    fontSize: '0.8rem',
-                    opacity: ocrProcessing ? 0.5 : 1
-                  }}
-                  title="앨범에서 계기판 사진 선택"
-                >
-                  🖼️ 앨범 선택
-                </button>
-                <input
-                  ref={albumInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAlbumCapture}
-                  style={{ display: 'none' }}
-                />
-              </div>
+              <button
+                type="button"
+                onClick={() => cameraInputRef.current?.click()}
+                disabled={ocrProcessing}
+                className="btn-secondary"
+                style={{ 
+                  padding: '8px 10px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  gap: '4px',
+                  fontSize: '0.8rem',
+                  whiteSpace: 'nowrap',
+                  opacity: ocrProcessing ? 0.5 : 1
+                }}
+                title="계기판 사진 촬영으로 자동 입력"
+              >
+                <Camera size={14} /> 촬영
+              </button>
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleOcrCapture}
+                style={{ display: 'none' }}
+              />
+              <button
+                type="button"
+                onClick={() => albumInputRef.current?.click()}
+                disabled={ocrProcessing}
+                className="btn-secondary"
+                style={{ 
+                  padding: '8px 10px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  gap: '4px',
+                  fontSize: '0.8rem',
+                  whiteSpace: 'nowrap',
+                  opacity: ocrProcessing ? 0.5 : 1
+                }}
+                title="앨범에서 계기판 사진 선택"
+              >
+                🖼️ 앨범
+              </button>
+              <input
+                ref={albumInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAlbumCapture}
+                style={{ display: 'none' }}
+              />
             </div>
           </div>
 
