@@ -61,7 +61,9 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate, edit
   // Camera OCR States
   const [ocrProcessing, setOcrProcessing] = useState(false);
   const [ocrError, setOcrError] = useState(null);
+  const [ocrPhotoDate, setOcrPhotoDate] = useState(null);
   const cameraInputRef = useRef(null);
+  const albumInputRef = useRef(null);
 
   // Google Schedule Sheet Integration States
   const [googleSpreadsheetId, setGoogleSpreadsheetId] = useState('19tUDOdY3bKZqt09leS-S9Q9Zqm5ZiVIHV61a7GHkf1Y');
@@ -604,20 +606,61 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate, edit
     }
   };
 
-  // Camera OCR: capture odometer photo and extract number
-  const handleOcrCapture = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    
+  // Extract EXIF date from image file
+  const extractExifDate = (file) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const view = new DataView(e.target.result);
+          // Check JPEG SOI marker
+          if (view.getUint16(0) !== 0xFFD8) { resolve(null); return; }
+          let offset = 2;
+          while (offset < view.byteLength - 2) {
+            const marker = view.getUint16(offset);
+            if (marker === 0xFFE1) { // APP1 (EXIF)
+              const length = view.getUint16(offset + 2);
+              const exifData = new Uint8Array(e.target.result, offset + 4, length - 2);
+              const text = new TextDecoder('ascii').decode(exifData);
+              // Find DateTimeOriginal or DateTime tag in ASCII
+              const dateMatch = text.match(/(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
+              if (dateMatch) {
+                resolve(`${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`);
+                return;
+              }
+              resolve(null);
+              return;
+            }
+            const segLength = view.getUint16(offset + 2);
+            offset += 2 + segLength;
+          }
+          resolve(null);
+        } catch {
+          resolve(null);
+        }
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  // Shared OCR processing logic
+  const processOcrFile = async (file) => {
     setOcrProcessing(true);
     setOcrError(null);
+    setOcrPhotoDate(null);
     
     try {
+      // Try extracting EXIF date
+      const exifDate = await extractExifDate(file);
+      if (exifDate) {
+        setOcrPhotoDate(exifDate);
+      }
+
       const result = await Tesseract.recognize(file, 'eng', {
         logger: () => {} // suppress logs
       });
       
-      // Extract numbers from OCR text (look for sequences of 4-6 digits)
       const text = result.data.text;
       const numbers = text.match(/\d[\d,. ]{2,}\d/g);
       
@@ -626,7 +669,6 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate, edit
         return;
       }
       
-      // Clean numbers and find the most likely odometer reading (largest number)
       const parsed = numbers.map(n => parseInt(n.replace(/[^\d]/g, ''))).filter(n => n > 100);
       
       if (parsed.length === 0) {
@@ -634,11 +676,14 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate, edit
         return;
       }
       
-      // Pick the largest number as the odometer reading
       const odometerValue = Math.max(...parsed);
+      let confirmMsg = `인식된 계기판 숫자: ${odometerValue.toLocaleString()} km`;
+      if (exifDate) {
+        confirmMsg += `\n사진 촬영일: ${exifDate}`;
+      }
+      confirmMsg += `\n\n이 값을 도착 계기판에 입력하시겠습니까?`;
       
-      // Confirm with user
-      const confirmed = window.confirm(`인식된 계기판 숫자: ${odometerValue.toLocaleString()} km\n\n이 값을 도착 계기판에 입력하시겠습니까?`);
+      const confirmed = window.confirm(confirmMsg);
       
       if (confirmed) {
         formDirtyRef.current = true;
@@ -652,8 +697,23 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate, edit
       setOcrError('사진 인식 중 오류가 발생했습니다. 다시 시도해 주세요.');
     } finally {
       setOcrProcessing(false);
-      e.target.value = ''; // Reset file input
     }
+  };
+
+  // Camera OCR handler
+  const handleOcrCapture = async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    await processOcrFile(file);
+  };
+
+  // Album OCR handler (no capture attribute)
+  const handleAlbumCapture = async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    await processOcrFile(file);
   };
 
   const handleSubmit = (e) => {
@@ -693,13 +753,35 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate, edit
       
       // Cascading odometer recalculation: update all subsequent records
       const otherLogs = logs.filter(l => l.id !== editingLog.id);
-      const allLogs = [...otherLogs, updatedLog];
+      let allLogs = [...otherLogs, updatedLog];
+      
+      // Cascade destination → next day's departure
+      // Find the next chronological log after this date and update its departure
+      const nextDayLogs = allLogs
+        .filter(l => l.date > updatedLog.date && l.id !== updatedLog.id)
+        .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+      
+      if (nextDayLogs.length > 0) {
+        const nextLog = nextDayLogs[0];
+        allLogs = allLogs.map(l => {
+          if (l.id === nextLog.id) {
+            return {
+              ...l,
+              depClass: updatedLog.destClass,
+              depName: updatedLog.destName,
+              depAddr: updatedLog.destAddr
+            };
+          }
+          return l;
+        });
+      }
+      
       const recalculated = recalculateAllOdomoters(allLogs, settings.baseOdometer);
       onLogsUpdate(recalculated);
       
       setEditingLog(null);
       setActiveTab('logs');
-      alert('운행 기록이 수정되었습니다. 후속 기록의 계기판도 자동으로 재계산되었습니다.');
+      alert('운행 기록이 수정되었습니다. 후속 기록의 계기판 및 다음날 출발지도 자동 동기화되었습니다.');
     } else {
       const newLog = {
         id: 'log-' + Date.now(),
@@ -899,6 +981,30 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate, edit
                   onChange={handleOcrCapture}
                   style={{ display: 'none' }}
                 />
+                <button
+                  type="button"
+                  onClick={() => albumInputRef.current?.click()}
+                  disabled={ocrProcessing}
+                  className="btn-secondary"
+                  style={{ 
+                    padding: '8px 10px', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    minWidth: '38px',
+                    opacity: ocrProcessing ? 0.5 : 1
+                  }}
+                  title="앨범에서 계기판 사진 선택"
+                >
+                  🖼️
+                </button>
+                <input
+                  ref={albumInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAlbumCapture}
+                  style={{ display: 'none' }}
+                />
               </div>
             </div>
           </div>
@@ -912,6 +1018,11 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate, edit
           {ocrError && (
             <p style={{ fontSize: '0.78rem', color: '#ef4444', margin: '4px 0 8px 0', padding: '6px 8px', background: 'rgba(239,68,68,0.05)', borderRadius: '4px' }}>
               ❌ {ocrError}
+            </p>
+          )}
+          {ocrPhotoDate && !ocrProcessing && !ocrError && (
+            <p style={{ fontSize: '0.78rem', color: '#10b981', margin: '4px 0 8px 0', padding: '6px 8px', background: 'rgba(16,185,129,0.05)', borderRadius: '4px' }}>
+              📅 사진 촬영일: {ocrPhotoDate}
             </p>
           )}
 
@@ -948,6 +1059,7 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate, edit
             <button 
               type="button" 
               onClick={() => {
+                formDirtyRef.current = false;
                 setEditingLog(null);
                 setActiveTab('logs');
               }} 
