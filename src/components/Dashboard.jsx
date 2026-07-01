@@ -834,37 +834,50 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate, edit
         ...logData
       };
       
-      // Cascading odometer recalculation: update all subsequent records
-      const otherLogs = logs.filter(l => l.id !== editingLog.id);
-      let allLogs = [...otherLogs, updatedLog];
+      // Sort chronologically to trace index
+      const sorted = [...logs].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+      const currentIndex = sorted.findIndex(l => l.id === editingLog.id);
       
-      // Cascade destination → next day's departure
-      // Find the next chronological log after this date and update its departure
-      const nextDayLogs = allLogs
-        .filter(l => l.date > updatedLog.date && l.id !== updatedLog.id)
-        .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+      let prevLog = null;
+      let nextLog = null;
       
-      if (nextDayLogs.length > 0) {
-        const nextLog = nextDayLogs[0];
-        allLogs = allLogs.map(l => {
-          if (l.id === nextLog.id) {
-            return {
-              ...l,
-              depClass: updatedLog.destClass,
-              depName: updatedLog.destName,
-              depAddr: updatedLog.destAddr
-            };
-          }
-          return l;
-        });
+      // 1. If Departure info changed: Update previous day's destination info (2일 출발 수정 -> 1일 도착 자동 수정)
+      const startOdoChanged = updatedLog.startOdometer !== editingLog.startOdometer;
+      const depAddrChanged = updatedLog.depAddr !== editingLog.depAddr || updatedLog.depClass !== editingLog.depClass;
+      if ((startOdoChanged || depAddrChanged) && currentIndex > 0) {
+        prevLog = { ...sorted[currentIndex - 1] };
+        prevLog.endOdometer = updatedLog.startOdometer;
+        prevLog.distance = Math.max(0, prevLog.endOdometer - prevLog.startOdometer);
+        prevLog.destClass = updatedLog.depClass;
+        prevLog.destName = updatedLog.depName;
+        prevLog.destAddr = updatedLog.depAddr;
       }
       
-      const recalculated = recalculateAllOdomoters(allLogs, settings.baseOdometer);
-      onLogsUpdate(recalculated);
+      // 2. If Destination info changed: Update next day's departure info (1일 도착 수정 -> 2일 출발 자동 수정)
+      const endOdoChanged = updatedLog.endOdometer !== editingLog.endOdometer;
+      const destAddrChanged = updatedLog.destAddr !== editingLog.destAddr || updatedLog.destClass !== editingLog.destClass;
+      if ((endOdoChanged || destAddrChanged) && currentIndex < sorted.length - 1) {
+        nextLog = { ...sorted[currentIndex + 1] };
+        nextLog.startOdometer = updatedLog.endOdometer;
+        nextLog.endOdometer = Math.round(nextLog.startOdometer + nextLog.distance);
+        nextLog.depClass = updatedLog.destClass;
+        nextLog.depName = updatedLog.destName;
+        nextLog.depAddr = updatedLog.destAddr;
+      }
+      
+      // Map back to update only target logs, keeping others completely unchanged
+      const updatedLogs = logs.map(l => {
+        if (l.id === updatedLog.id) return updatedLog;
+        if (prevLog && l.id === prevLog.id) return prevLog;
+        if (nextLog && l.id === nextLog.id) return nextLog;
+        return l;
+      });
+      
+      onLogsUpdate(updatedLogs);
       
       setEditingLog(null);
       setActiveTab('logs');
-      alert('운행 기록이 수정되었습니다. 후속 기록의 계기판 및 다음날 출발지도 자동 동기화되었습니다.');
+      alert('운행 기록이 수정되었습니다. 인접한 전날 도착지 또는 다음날 출발지가 정밀 동기화되었습니다.');
     } else {
       const newLog = {
         id: 'log-' + Date.now(),
