@@ -329,12 +329,32 @@ export default function Logs({ logs, settings, onDeleteLog, onDeleteMultipleLogs
                         <strong>{log.depClass}</strong>
                         <span style={{ color: 'var(--text-muted)' }}>&rarr;</span>
                         <strong>{log.destClass}</strong>
-                        {log.visitedPlaces && (
-                          <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 500, marginLeft: '4px', wordBreak: 'break-all' }}>
-                            (경유: {log.visitedPlaces})
-                          </span>
-                        )}
                       </div>
+                      
+                      {/* Visited Places Badges */}
+                      {log.visitedPlaces && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px', marginBottom: '4px' }}>
+                          {log.visitedPlaces.split(',').filter(Boolean).map((place, idx) => (
+                            <span 
+                              key={idx} 
+                              style={{ 
+                                fontSize: '0.68rem', 
+                                background: 'rgba(6, 182, 212, 0.08)', 
+                                color: 'var(--primary)', 
+                                padding: '2px 6px', 
+                                borderRadius: '4px', 
+                                fontWeight: 600,
+                                border: '1px solid rgba(6, 182, 212, 0.15)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '2px'
+                              }}
+                            >
+                              📍 {place.trim()}
+                            </span>
+                          ))}
+                        </div>
+                      )}
 
                       {/* Addresses (if provided) */}
                       {(log.depAddr || log.destAddr) && (
@@ -349,7 +369,7 @@ export default function Logs({ logs, settings, onDeleteLog, onDeleteMultipleLogs
                           {log.depAddr && <div style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>출발: {log.depAddr}</div>}
                           {log.destAddr && (
                             <div style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', marginTop: '2px' }}>
-                              도착: {log.destAddr}{log.visitedPlaces ? `(${log.visitedPlaces})` : ''}
+                              도착: {log.destAddr}
                             </div>
                           )}
                         </div>

@@ -644,6 +644,67 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate, edit
     });
   };
 
+  // Canvas-based Image Preprocessing for OCR (Grayscale + High Contrast)
+  const preprocessImage = (file) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          // Downscale to target max width 800 for optimal processing speed
+          const maxDim = 800;
+          let w = img.width;
+          let h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
+          
+          canvas.width = w;
+          canvas.height = h;
+          ctx.drawImage(img, 0, 0, w, h);
+          
+          const imgData = ctx.getImageData(0, 0, w, h);
+          const data = imgData.data;
+          
+          // Greyscale conversion & Contrast amplification
+          for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i+1];
+            const b = data[i+2];
+            
+            // Greyscale luminance formula
+            let gray = 0.299 * r + 0.587 * g + 0.114 * b;
+            
+            // Increase contrast heavily to make digital odometer numbers stand out
+            const factor = 1.6;
+            gray = (gray - 128) * factor + 128;
+            gray = Math.max(0, Math.min(255, gray));
+            
+            data[i] = gray;
+            data[i+1] = gray;
+            data[i+2] = gray;
+          }
+          ctx.putImageData(imgData, 0, 0);
+          
+          canvas.toBlob((blob) => {
+            resolve(blob || file);
+          }, 'image/jpeg', 0.9);
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
   // Shared OCR processing logic
   const processOcrFile = async (file) => {
     setOcrProcessing(true);
@@ -651,35 +712,57 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate, edit
     setOcrPhotoDate(null);
     
     try {
-      // Try extracting EXIF date
-      const exifDate = await extractExifDate(file);
-      if (exifDate) {
-        setOcrPhotoDate(exifDate);
+      // 1. Try extracting EXIF date from JPEG APP1 header
+      let photoDate = await extractExifDate(file);
+      
+      // 2. Fallback to file's last modified timestamp (almost always available via input/gallery pick)
+      if (!photoDate && file.lastModified) {
+        try {
+          const fileDate = new Date(file.lastModified);
+          if (!isNaN(fileDate.getTime())) {
+            photoDate = fileDate.toISOString().slice(0, 10);
+          }
+        } catch (err) {
+          console.warn('lastModified parsing failed:', err);
+        }
+      }
+      
+      if (photoDate) {
+        setOcrPhotoDate(photoDate);
       }
 
-      const result = await Tesseract.recognize(file, 'eng', {
-        logger: () => {} // suppress logs
+      // Preprocess image to enhance OCR accuracy
+      const preprocessedBlob = await preprocessImage(file);
+
+      // Perform OCR with digit-only whitelist parameters
+      const result = await Tesseract.recognize(preprocessedBlob, 'eng', {
+        logger: () => {}, // suppress logs
+        parameters: {
+          tessedit_char_whitelist: '0123456789'
+        }
       });
       
       const text = result.data.text;
-      const numbers = text.match(/\d[\d,. ]{2,}\d/g);
+      const cleanedText = text.replace(/\s+/g, ' ');
+      const numbers = cleanedText.match(/\d{4,6}/g); // Extract odometer values (4 to 6 digit ranges)
       
       if (!numbers || numbers.length === 0) {
         setOcrError('숫자를 인식하지 못했습니다. 더 선명한 사진으로 다시 시도해 주세요.');
         return;
       }
       
-      const parsed = numbers.map(n => parseInt(n.replace(/[^\d]/g, ''))).filter(n => n > 100);
+      const parsed = numbers.map(n => parseInt(n)).filter(n => n > 100);
       
       if (parsed.length === 0) {
         setOcrError('유효한 계기판 숫자를 찾을 수 없습니다.');
         return;
       }
       
+      // Select the maximum matching number as odometer reading
       const odometerValue = Math.max(...parsed);
       let confirmMsg = `인식된 계기판 숫자: ${odometerValue.toLocaleString()} km`;
-      if (exifDate) {
-        confirmMsg += `\n사진 촬영일: ${exifDate}`;
+      if (photoDate) {
+        confirmMsg += `\n사진 생성일(갤러리/EXIF): ${photoDate}`;
       }
       confirmMsg += `\n\n이 값을 도착 계기판에 입력하시겠습니까?`;
       
@@ -916,13 +999,19 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate, edit
           {/* Visited Places Input */}
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label" style={{ fontSize: '0.75rem' }}>방문한 곳 (경유지)</label>
-            <input 
-              type="text" 
+            <textarea 
               placeholder="예: 용산역, 잠원도서관 (쉼표로 구분)" 
               value={visitedPlaces} 
               onChange={(e) => setVisitedPlaces(e.target.value)} 
               className="form-control"
-              style={{ padding: '8px 12px', fontSize: '0.85rem' }}
+              style={{ 
+                padding: '8px 12px', 
+                fontSize: '0.85rem', 
+                minHeight: '54px', 
+                resize: 'vertical',
+                lineHeight: '1.4',
+                fontFamily: 'inherit'
+              }}
             />
           </div>
         </div>
@@ -946,32 +1035,34 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate, edit
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label" style={{ fontSize: '0.75rem' }}>도착 계기판</label>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <input 
-                  type="number" 
-                  value={endOdometer} 
-                  onChange={(e) => handleOdometerChange('end', e.target.value)} 
-                  className="form-control" 
-                  style={{ padding: '8px 12px', fontSize: '0.85rem', flex: 1 }}
-                  placeholder="km"
-                  required
-                />
+              <input 
+                type="number" 
+                value={endOdometer} 
+                onChange={(e) => handleOdometerChange('end', e.target.value)} 
+                className="form-control" 
+                style={{ padding: '8px 12px', fontSize: '0.85rem', width: '100%', marginBottom: '8px' }}
+                placeholder="km"
+                required
+              />
+              <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   type="button"
                   onClick={() => cameraInputRef.current?.click()}
                   disabled={ocrProcessing}
                   className="btn-secondary"
                   style={{ 
+                    flex: 1,
                     padding: '8px 10px', 
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'center',
-                    minWidth: '38px',
+                    gap: '6px',
+                    fontSize: '0.8rem',
                     opacity: ocrProcessing ? 0.5 : 1
                   }}
                   title="계기판 사진 촬영으로 자동 입력"
                 >
-                  <Camera size={16} />
+                  <Camera size={14} /> 카메라 촬영
                 </button>
                 <input
                   ref={cameraInputRef}
@@ -987,16 +1078,18 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate, edit
                   disabled={ocrProcessing}
                   className="btn-secondary"
                   style={{ 
+                    flex: 1,
                     padding: '8px 10px', 
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'center',
-                    minWidth: '38px',
+                    gap: '6px',
+                    fontSize: '0.8rem',
                     opacity: ocrProcessing ? 0.5 : 1
                   }}
                   title="앨범에서 계기판 사진 선택"
                 >
-                  🖼️
+                  🖼️ 앨범 선택
                 </button>
                 <input
                   ref={albumInputRef}
