@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { PlusCircle, Navigation, MapPin, Check, Calendar, Users, RefreshCw, Upload } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { PlusCircle, Navigation, MapPin, Check, Calendar, Users, RefreshCw, Upload, Camera } from 'lucide-react';
 import { fetchScheduleSheet } from '../utils/googleSheets';
 import * as XLSX from 'xlsx';
+import Tesseract from 'tesseract.js';
 
 export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate, editingLog, setEditingLog, setActiveTab, onUpdateLog }) {
   const getTodayStr = () => new Date().toISOString().slice(0, 10);
@@ -51,6 +52,16 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate, edit
 
   const [showAddress, setShowAddress] = useState(false); // Toggle for detailed address inputs
   const [showSuccess, setShowSuccess] = useState(false);
+
+  // Form dirty flag: prevents useEffect from overwriting user input
+  const formDirtyRef = useRef(false);
+  const prevEditingLogIdRef = useRef(null);
+  const prevDateRef = useRef(date);
+
+  // Camera OCR States
+  const [ocrProcessing, setOcrProcessing] = useState(false);
+  const [ocrError, setOcrError] = useState(null);
+  const cameraInputRef = useRef(null);
 
   // Google Schedule Sheet Integration States
   const [googleSpreadsheetId, setGoogleSpreadsheetId] = useState('19tUDOdY3bKZqt09leS-S9Q9Zqm5ZiVIHV61a7GHkf1Y');
@@ -421,14 +432,22 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate, edit
     alert(msg);
   };
 
-  // Update starting odometer whenever logs or settings change
+  // Update starting odometer whenever logs or settings change (only when form is clean)
   useEffect(() => {
-    setStartOdometer(getLatestEndOdometer());
+    if (!formDirtyRef.current && !editingLog) {
+      setStartOdometer(getLatestEndOdometer());
+    }
   }, [logs, settings]);
 
   // Auto fill form fields if a log already exists for the selected date
   useEffect(() => {
-    if (editingLog) {
+    // When editingLog changes to a NEW log (different id), always fill form
+    const newEditId = editingLog ? editingLog.id : null;
+    const isNewEdit = newEditId && newEditId !== prevEditingLogIdRef.current;
+    prevEditingLogIdRef.current = newEditId;
+
+    if (isNewEdit) {
+      formDirtyRef.current = false;
       setDate(editingLog.date);
       setDistance(editingLog.distance !== undefined ? editingLog.distance : '');
       setVisitedPlaces(editingLog.visitedPlaces || '');
@@ -442,6 +461,20 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate, edit
       setDestAddr(editingLog.destAddr || '');
       setStartOdometer(editingLog.startOdometer !== undefined ? editingLog.startOdometer : '');
       setEndOdometer(editingLog.endOdometer !== undefined ? editingLog.endOdometer : '');
+      return;
+    }
+
+    // If editingLog exists but hasn't changed id, or form is dirty, skip overwrite
+    if (editingLog || formDirtyRef.current) {
+      return;
+    }
+
+    // Check if date actually changed (not just logs/settings update)
+    const dateChanged = date !== prevDateRef.current;
+    prevDateRef.current = date;
+
+    // If only logs/settings changed (not date), skip form overwrite to protect user input
+    if (!dateChanged) {
       return;
     }
 
@@ -489,8 +522,64 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate, edit
     }
   }, [date, logs, settings, editingLog]);
 
+  // Auto-load schedule when date changes and no existing log for that date
+  useEffect(() => {
+    if (editingLog) return;
+    const existingLog = logs.find(l => l.date === date);
+    if (existingLog) return; // Already has a record, skip auto-load
+    if (!settings.driverName || !settings.driverName.trim()) return;
+    
+    let cancelled = false;
+    const autoLoadSchedule = async () => {
+      try {
+        const rows = await fetchScheduleSheet(googleSpreadsheetId, scheduleSheetName);
+        if (cancelled || !rows || rows.length === 0) return;
+        
+        const headerRow = rows[0];
+        const driverNameClean = settings.driverName.trim();
+        const colIdx = headerRow.findIndex(cell => cell && String(cell).includes(driverNameClean));
+        if (colIdx === -1) return;
+        
+        let foundRow = null;
+        for (let r = 1; r < rows.length; r++) {
+          const rowDateStr = rows[r][0];
+          if (!rowDateStr) continue;
+          const parsedDate = parseSheetDate(scheduleYear, rowDateStr);
+          if (parsedDate === date) {
+            foundRow = rows[r];
+            break;
+          }
+        }
+        if (!foundRow) return;
+        
+        const cellValue = foundRow[colIdx] ? String(foundRow[colIdx]).trim() : '';
+        if (!cellValue) return;
+        
+        const extractedPlaces = extractPlaces(cellValue);
+        if (cancelled) return;
+        
+        if (extractedPlaces && !formDirtyRef.current) {
+          setVisitedPlaces(extractedPlaces);
+          setActiveScheduleResult({
+            driverName: driverNameClean,
+            date,
+            rawText: cellValue,
+            visitedPlaces: extractedPlaces
+          });
+        }
+      } catch (err) {
+        // Silently fail for auto-load
+        console.warn('일정 자동 로드 실패:', err.message);
+      }
+    };
+    
+    autoLoadSchedule();
+    return () => { cancelled = true; };
+  }, [date]);
+
   // Recalculate distance when start or end odometer changes
   const handleOdometerChange = (type, value) => {
+    formDirtyRef.current = true;
     const val = value === '' ? '' : parseInt(value) || 0;
     if (type === 'start') {
       setStartOdometer(val);
@@ -507,10 +596,63 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate, edit
 
   // Recalculate end odometer when distance changes
   const handleDistanceChange = (value) => {
+    formDirtyRef.current = true;
     const val = value === '' ? '' : parseFloat(value) || 0;
     setDistance(val);
     if (startOdometer !== '' && val !== '') {
       setEndOdometer(Math.round(startOdometer + val));
+    }
+  };
+
+  // Camera OCR: capture odometer photo and extract number
+  const handleOcrCapture = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    setOcrProcessing(true);
+    setOcrError(null);
+    
+    try {
+      const result = await Tesseract.recognize(file, 'eng', {
+        logger: () => {} // suppress logs
+      });
+      
+      // Extract numbers from OCR text (look for sequences of 4-6 digits)
+      const text = result.data.text;
+      const numbers = text.match(/\d[\d,. ]{2,}\d/g);
+      
+      if (!numbers || numbers.length === 0) {
+        setOcrError('숫자를 인식하지 못했습니다. 더 선명한 사진으로 다시 시도해 주세요.');
+        return;
+      }
+      
+      // Clean numbers and find the most likely odometer reading (largest number)
+      const parsed = numbers.map(n => parseInt(n.replace(/[^\d]/g, ''))).filter(n => n > 100);
+      
+      if (parsed.length === 0) {
+        setOcrError('유효한 계기판 숫자를 찾을 수 없습니다.');
+        return;
+      }
+      
+      // Pick the largest number as the odometer reading
+      const odometerValue = Math.max(...parsed);
+      
+      // Confirm with user
+      const confirmed = window.confirm(`인식된 계기판 숫자: ${odometerValue.toLocaleString()} km\n\n이 값을 도착 계기판에 입력하시겠습니까?`);
+      
+      if (confirmed) {
+        formDirtyRef.current = true;
+        setEndOdometer(odometerValue);
+        if (startOdometer !== '' && odometerValue > startOdometer) {
+          setDistance(Math.max(0, odometerValue - startOdometer));
+        }
+      }
+    } catch (err) {
+      console.error('OCR Error:', err);
+      setOcrError('사진 인식 중 오류가 발생했습니다. 다시 시도해 주세요.');
+    } finally {
+      setOcrProcessing(false);
+      e.target.value = ''; // Reset file input
     }
   };
 
@@ -544,13 +686,20 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate, edit
     };
 
     if (editingLog) {
-      onUpdateLog({
+      const updatedLog = {
         ...editingLog,
         ...logData
-      });
+      };
+      
+      // Cascading odometer recalculation: update all subsequent records
+      const otherLogs = logs.filter(l => l.id !== editingLog.id);
+      const allLogs = [...otherLogs, updatedLog];
+      const recalculated = recalculateAllOdomoters(allLogs, settings.baseOdometer);
+      onLogsUpdate(recalculated);
+      
       setEditingLog(null);
       setActiveTab('logs');
-      alert('운행 기록이 성공적으로 수정되었습니다.');
+      alert('운행 기록이 수정되었습니다. 후속 기록의 계기판도 자동으로 재계산되었습니다.');
     } else {
       const newLog = {
         id: 'log-' + Date.now(),
@@ -561,7 +710,8 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate, edit
       setTimeout(() => setShowSuccess(false), 2000);
     }
 
-    // Reset fields
+    // Reset fields and formDirty
+    formDirtyRef.current = false;
     setEndOdometer('');
     setDistance('');
     setVisitedPlaces('');
@@ -714,17 +864,56 @@ export default function Dashboard({ settings, logs, onAddLog, onLogsUpdate, edit
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label" style={{ fontSize: '0.75rem' }}>도착 계기판</label>
-              <input 
-                type="number" 
-                value={endOdometer} 
-                onChange={(e) => handleOdometerChange('end', e.target.value)} 
-                className="form-control" 
-                style={{ padding: '8px 12px', fontSize: '0.85rem' }}
-                placeholder="km"
-                required
-              />
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <input 
+                  type="number" 
+                  value={endOdometer} 
+                  onChange={(e) => handleOdometerChange('end', e.target.value)} 
+                  className="form-control" 
+                  style={{ padding: '8px 12px', fontSize: '0.85rem', flex: 1 }}
+                  placeholder="km"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  disabled={ocrProcessing}
+                  className="btn-secondary"
+                  style={{ 
+                    padding: '8px 10px', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    minWidth: '38px',
+                    opacity: ocrProcessing ? 0.5 : 1
+                  }}
+                  title="계기판 사진 촬영으로 자동 입력"
+                >
+                  <Camera size={16} />
+                </button>
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleOcrCapture}
+                  style={{ display: 'none' }}
+                />
+              </div>
             </div>
           </div>
+
+          {/* OCR Status */}
+          {ocrProcessing && (
+            <p style={{ fontSize: '0.8rem', color: 'var(--primary)', textAlign: 'center', margin: '8px 0' }}>
+              📷 계기판 숫자 인식 중...
+            </p>
+          )}
+          {ocrError && (
+            <p style={{ fontSize: '0.78rem', color: '#ef4444', margin: '4px 0 8px 0', padding: '6px 8px', background: 'rgba(239,68,68,0.05)', borderRadius: '4px' }}>
+              ❌ {ocrError}
+            </p>
+          )}
 
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label" style={{ fontSize: '0.75rem' }}>주행 거리</label>
