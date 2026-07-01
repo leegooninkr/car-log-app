@@ -344,13 +344,10 @@ export default function Logs({ logs, settings, onDeleteLog, onDeleteMultipleLogs
                                 padding: '2px 6px', 
                                 borderRadius: '4px', 
                                 fontWeight: 600,
-                                border: '1px solid rgba(6, 182, 212, 0.15)',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '2px'
+                                border: '1px solid rgba(6, 182, 212, 0.15)'
                               }}
                             >
-                              📍 {place.trim()}
+                              {place.trim()}
                             </span>
                           ))}
                         </div>
